@@ -22,22 +22,27 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script>
 let images = new Array(20).fill(null);
+let mayaImages = new Array(27).fill(null);
 const transparencyThreshold = 128;
-const numOfStreams = 3000;
+const numOfStreams = 3750;
 let imgCenter; 
 let pointImageOverlapCache = {};  
 let circleDiameter;
 let streamGroups = [];
+let mayaStreamGroups = [];
 let desiredStreamCounts = [];
+let mayaDesiredStreamCounts = [];
 let totalStreamsToGenerate = 0;
 const REF_AREA = 1920 * 1080;
 const BASE_SPEED = .01;
 const LOG_SCALE_FACTOR = .95;
 let selectedColorSet;
+let selectedMayaColorSet;
 let MARGIN;
 let isColorCycling = false;
 let baseHue = 0;
-const COLOR_CYCLE_SPEED = 1.1;
+const COLOR_CYCLE_SPEED = 1.5;
+const MAX_MAYA_SPLIT = 0.5; // 0.5 means 50% Max, 50% Maya
 
 // Define initialization rectangles
 const initRectangles = [
@@ -63,6 +68,36 @@ const initRectangles = [
     { width: 93, height: 75, x: 56, y: 38 }    // face.png
 ];
 
+const mayaInitRectangles = [
+    { width: 39, height: 60, x: 9, y: 33 },    // mHatTop.png
+    { width: 81, height: 64, x: 14, y: 32 },   // mHatMid.png
+    { width: 95, height: 83, x: 14, y: 35 },   // mHatBottom.png
+    { width: 76, height: 63, x: 12, y: 83 },   // mPantLeft.png
+    { width: 39, height: 38, x: 29, y: 83 },   // mPantMid.png
+    { width: 32, height: 56, x: 44, y: 84 },   // mPantRight.png
+    { width: 73, height: 42, x: 28, y: 87 },   // mHands.png
+    { width: 31, height: 30, x: 9, y: 66 },    // mSweaterArm1.png
+    { width: 47, height: 52, x: 9, y: 70 },    // mSweaterArm2.png
+    { width: 53, height: 37, x: 11, y: 78 },   // mSweaterArm3.png
+    { width: 62, height: 50, x: 14, y: 80 },   // mSweaterArm4.png
+    { width: 52, height: 50, x: 20, y: 84 },   // mSweaterArm5.png
+    { width: 85, height: 65, x: 25, y: 54 },   // mSweater1.png
+    { width: 85, height: 75, x: 26, y: 58 },   // mSweater2.png
+    { width: 85, height: 85, x: 26, y: 64 },   // mSweater3.png
+    { width: 85, height: 55, x: 27, y: 72 },   // mSweater4.png
+    { width: 85, height: 57, x: 27, y: 74 },   // mSweater5.png
+    { width: 48, height: 63, x: 37, y: 78 },   // mSweater6.png
+    { width: 69, height: 152, x: 12, y: 54 },  // mScarfVert.png
+    { width: 30, height: 73, x: 6, y: 71 },    // mScarfOverhangBack.png
+    { width: 30, height: 78, x: 8, y: 57 },    // mScarfOverhang.png
+    { width: 73, height: 46, x: 21, y: 52 },   // mScarfNeck.png
+    { width: 37, height: 20, x: 25, y: 48 },   // mMouth.png
+    { width: 70, height: 74, x: 19, y: 40 },   // mFace.png
+    { width: 36, height: 60, x: 17, y: 44 },   // mHairLeft.png
+    { width: 48, height: 17, x: 24, y: 39 },   // mHairMid.png
+    { width: 26, height: 53, x: 35, y: 45 }    // mHairRight.png
+];
+
 const colorSets = [
     [
         [225, 125, 114],    // hatStripe.png - Golden yellow
@@ -85,6 +120,38 @@ const colorSets = [
         [0, 0, 0],     // rightEye.png - Dark gray
         [0, 0, 1],     // leftEye.png - Dark gray
         [255, 220, 180]   // face.png - Light skin tone
+    ]
+];
+
+const mayaColorSets = [
+    [
+        [218, 71, 63],     // mHatTop.png - Dark red
+        [135, 103, 134],      // mHatMid.png - Dark gray
+        [225, 99, 83],      // mHatBottom.png - Dark gray
+        [38, 40, 96],      // mPantLeft.png - Burgundy
+        [35, 36, 91],      // mPantMid.png - Burgundy
+        [37, 39, 94],      // mPantRight.png - Burgundy
+        [241, 189, 164],   // mHands.png - Light skin tone
+        [232, 179, 102],     // mSweaterArm1.png - Deep red
+        [16, 80, 75],     // mSweaterArm2.png - Deep red
+        [21, 87, 130],     // mSweaterArm3.png - Deep red
+        [110, 70, 114],     // mSweaterArm4.png - Deep red
+        [119, 22, 37],     // mSweaterArm5.png - Deep red
+        [234, 117, 101],     // mSweater1.png - Deep red
+        [232, 179, 103],     // mSweater2.png - Deep red
+        [16, 80, 76],     // mSweater3.png - Deep red
+        [21, 87, 131],     // mSweater4.png - Deep red
+        [110, 70, 115],     // mSweater5.png - Deep red
+        [119, 22, 38],     // mSweater6.png - Deep red
+        [194, 41, 86],     // mScarfVert.png - Deep red
+        [181, 65, 77],     // mScarfOverhangBack.png - Deep red
+        [137, 22, 33],     // mScarfOverhang.png - Deep red
+        [137, 22, 34],     // mScarfNeck.png - Deep red
+        [200, 50, 76],     // mMouth.png - Deep red
+        [241, 189, 164],   // mFace.png - Light skin tone
+        [57, 25, 17],      // mHairLeft.png - Dark gray
+        [57, 25, 16],      // mHairMid.png - Dark gray
+        [57, 25, 15]       // mHairRight.png - Dark gray
     ]
 ];
 
@@ -125,18 +192,39 @@ function preload() {
     calculateMargin();
     let dimensions = calculateImageDimensions();
     
-    let imageNames = [
-        "hatStripe.png", "hatTop.png", "hatBottom.png", "pantsLeft.png", "pantsMid.png",
-        "pantsRight.png", "hands.png", "cuffRight.png", "cuffLeft.png", "scarf7.png",
-        "scarf6.png", "scarf5.png", "scarf4.png", "scarf3.png", "scarf2.png", 
-        "scarf1.png", "mouth.png", "rightEye.png", "leftEye.png", "face.png"
+    let maxImageNames = [
+        "max/hatStripe.png", "max/hatTop.png", "max/hatBottom.png", "max/pantsLeft.png", "max/pantsMid.png",
+        "max/pantsRight.png", "max/hands.png", "max/cuffRight.png", "max/cuffLeft.png", "max/scarf7.png",
+        "max/scarf6.png", "max/scarf5.png", "max/scarf4.png", "max/scarf3.png", "max/scarf2.png", 
+        "max/scarf1.png", "max/mouth.png", "max/rightEye.png", "max/leftEye.png", "max/face.png"
+    ];
+
+    let mayaImageNames = [
+        "maya/mHatTop.png", "maya/mHatMid.png", "maya/mHatBottom.png",
+        "maya/mPantLeft.png", "maya/mPantMid.png", "maya/mPantRight.png",
+        "maya/mHands.png",
+        "maya/mSweaterArm1.png", "maya/mSweaterArm2.png", "maya/mSweaterArm3.png",
+        "maya/mSweaterArm4.png", "maya/mSweaterArm5.png",
+        "maya/mSweater1.png", "maya/mSweater2.png", "maya/mSweater3.png",
+        "maya/mSweater4.png", "maya/mSweater5.png", "maya/mSweater6.png",
+        "maya/mScarfVert.png", "maya/mScarfOverhangBack.png", "maya/mScarfOverhang.png",
+        "maya/mScarfNeck.png", "maya/mMouth.png", "maya/mFace.png",
+        "maya/mHairLeft.png", "maya/mHairMid.png", "maya/mHairRight.png"
     ];
     
-    for (let i = 0; i < imageNames.length; i++) {
-        loadImage(imageNames[i], img => {
+    for (let i = 0; i < maxImageNames.length; i++) {
+        loadImage(maxImageNames[i], img => {
             let scaleFactor = dimensions.imageHeight / img.height;
             img.resize(img.width * scaleFactor, img.height * scaleFactor);
             images[i] = img;
+        });
+    }
+    
+    for (let i = 0; i < mayaImageNames.length; i++) {
+        loadImage(mayaImageNames[i], img => {
+            let scaleFactor = dimensions.imageHeight / img.height;
+            img.resize(img.width * scaleFactor, img.height * scaleFactor);
+            mayaImages[i] = img;
         });
     }
 }
@@ -152,14 +240,14 @@ function generateStreams() {
     let areaRatio = (windowWidth * windowHeight) / REF_AREA;
     let adjustedNumOfStreams = Math.round(numOfStreams * areaRatio);
 
-    // Distribution percentages for each image (must add up to 1.0)
-    const percentages = [
+    // Distribution percentages for Max (must add up to 1.0)
+    const maxPercentages = [
         0.03,  // hatStripe.png
         0.03,  // hatTop.png
         0.05,  // hatBottom.png
-        0.04,  // pantsLeft.png
+        0.03,  // pantsLeft.png
         0.02,  // pantsMid.png
-        0.04,  // pantsRight.png
+        0.03,  // pantsRight.png
         0.06,  // hands.png
         0.04,  // cuffRight.png
         0.04,  // cuffLeft.png
@@ -173,14 +261,55 @@ function generateStreams() {
         0.005,  // mouth.png
         0.02,  // rightEye.png
         0.02,  // leftEye.png
-        0.125   // face.png
-    ];  // Total: 1.0 (100%)
+        0.145   // face.png
+    ];
+
+    // Distribution percentages for Maya (must add up to 1.0)
+    const mayaPercentages = [
+        0.02,  // mHatTop.png
+        0.03,  // mHatMid.png
+        0.03,  // mHatBottom.png
+        0.01,  // mPantLeft.png
+        0.01,  // mPantMid.png
+        0.01,  // mPantRight.png
+        0.04,  // mHands.png
+        0.02,  // mSweaterArm1.png
+        0.02,  // mSweaterArm2.png
+        0.02,  // mSweaterArm3.png
+        0.02,  // mSweaterArm4.png
+        0.02,  // mSweaterArm5.png
+        0.04,  // mSweater1.png
+        0.04,  // mSweater2.png
+        0.04,  // mSweater3.png
+        0.04,  // mSweater4.png
+        0.04,  // mSweater5.png
+        0.05,  // mSweater6.png
+        0.07,  // mScarfVert.png
+        0.03,  // mScarfOverhangBack.png
+        0.03,  // mScarfOverhang.png
+        0.05,  // mScarfNeck.png
+        0.005, // mMouth.png
+        0.16,  // mFace.png
+        0.02,  // mHairLeft.png
+        0.02,  // mHairMid.png
+        0.02   // mHairRight.png
+    ];
 
     desiredStreamCounts = [];
+    mayaDesiredStreamCounts = [];
 
-    for (let j = 0; j < percentages.length; j++) {
-        let desiredCountForImage = Math.round(adjustedNumOfStreams * percentages[j]);
+    // Calculate streams for Max
+    let maxStreams = Math.round(adjustedNumOfStreams * MAX_MAYA_SPLIT);
+    for (let j = 0; j < maxPercentages.length; j++) {
+        let desiredCountForImage = Math.round(maxStreams * maxPercentages[j]);
         desiredStreamCounts.push(desiredCountForImage);
+    }
+
+    // Calculate streams for Maya
+    let mayaStreams = Math.round(adjustedNumOfStreams * (1 - MAX_MAYA_SPLIT));
+    for (let j = 0; j < mayaPercentages.length; j++) {
+        let desiredCountForImage = Math.round(mayaStreams * mayaPercentages[j]);
+        mayaDesiredStreamCounts.push(desiredCountForImage);
     }
     
     totalStreamsToGenerate = adjustedNumOfStreams;
@@ -194,9 +323,14 @@ function setup() {
     for (let i = 0; i < 20; i++) {
         streamGroups.push([]);
     }
+    
+    for (let i = 0; i < 27; i++) {  // Updated to 27 for Maya
+        mayaStreamGroups.push([]);
+    }
 
     generateStreams();
     selectedColorSet = colorSets[0];
+    selectedMayaColorSet = mayaColorSets[0];
 }
 
 function windowResized() {
@@ -233,21 +367,30 @@ function isOverAnyImageCached(point) {
 }
 
 function draw() {
-    if (!selectedColorSet) return;
+    if (!selectedColorSet || !selectedMayaColorSet) return;
     
     background(0, 0, 0);
     pointImageOverlapCache = {};
-    // drawTransparentCircle();
 
     if (isColorCycling) {
         baseHue = (baseHue + COLOR_CYCLE_SPEED) % 360;
         selectedColorSet = generateColorSet();
+        selectedMayaColorSet = generateMayaColorSet();
         updateStreamColors();
     }
 
     adjustStreams();
 
+    // Draw Max streams
     for (let streams of streamGroups) {
+        for (let s of streams) {
+            s.update();
+            s.display();
+        }
+    }
+
+    // Draw Maya streams
+    for (let streams of mayaStreamGroups) {
         for (let s of streams) {
             s.update();
             s.display();
@@ -256,12 +399,13 @@ function draw() {
 }
 
 function adjustStreams() {
-    if (!selectedColorSet) return;
+    if (!selectedColorSet || !selectedMayaColorSet) return;
 
+    // Adjust Max streams
     for (let j = 0; j < 20; j++) {
         while (streamGroups[j].length < desiredStreamCounts[j]) {
             let samplePoint = streamGroups[j].length > 0 ? random(random(streamGroups[j]).points) : null;
-            streamGroups[j].push(new Stream(selectedColorSet[j], j, samplePoint));
+            streamGroups[j].push(new Stream(selectedColorSet[j], j, samplePoint, false));
         }
 
         while (streamGroups[j].length > desiredStreamCounts[j]) {
@@ -270,6 +414,28 @@ function adjustStreams() {
                 lastStream.fade();
                 if (lastStream.alpha <= 0) {
                     streamGroups[j].pop();
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    // Adjust Maya streams
+    for (let j = 0; j < 27; j++) {
+        while (mayaStreamGroups[j].length < mayaDesiredStreamCounts[j]) {
+            let samplePoint = mayaStreamGroups[j].length > 0 ? random(random(mayaStreamGroups[j]).points) : null;
+            mayaStreamGroups[j].push(new Stream(selectedMayaColorSet[j], j, samplePoint, true));
+        }
+
+        while (mayaStreamGroups[j].length > mayaDesiredStreamCounts[j]) {
+            let lastStream = mayaStreamGroups[j][mayaStreamGroups[j].length - 1];
+            if (lastStream) {
+                lastStream.fade();
+                if (lastStream.alpha <= 0) {
+                    mayaStreamGroups[j].pop();
                 } else {
                     break;
                 }
@@ -316,17 +482,32 @@ function mousePressed() {
 }
 
 function keyPressed() {
-    if (key >= '1' && key <= '4') {
+    if (key === ' ') {  // Space bar
+        isColorCycling = false;
+        baseHue = 0;
+        selectedColorSet = colorSets[0];
+        selectedMayaColorSet = mayaColorSets[0];
+        updateStreamColors();
+    } else if (key >= '1' && key <= '4') {
         let paletteIndex = parseInt(key) - 1;
         selectedColorSet = colorSets[paletteIndex];
+        selectedMayaColorSet = mayaColorSets[paletteIndex];
         updateStreamColors();
     }
 }
 
 function updateStreamColors() {
+    // Update Max stream colors
     for (let j = 0; j < streamGroups.length; j++) {
         for (let stream of streamGroups[j]) {
             stream.color = selectedColorSet[j];
+        }
+    }
+
+    // Update Maya stream colors
+    for (let j = 0; j < mayaStreamGroups.length; j++) {
+        for (let stream of mayaStreamGroups[j]) {
+            stream.color = selectedMayaColorSet[j];
         }
     }
 }
@@ -339,13 +520,14 @@ function updateStreamColors() {
 // }
 
 class Stream {
-    constructor(color, assignedImageIdx, startPoint = null) {
+    constructor(color, assignedImageIdx, startPoint = null, isMaya = false) {
         this.color = color;
         this.points = [];
         this.noiseOffset = random(1000);
         this.currentAngle = random(TWO_PI);
         this.attractMode = getCurrentAttractMode();
         this.assignedImageIdx = assignedImageIdx;
+        this.isMaya = isMaya;
         this.initStream(startPoint);
         this.insideImage = this.isOverAssignedImage(this.points[0]);
         this.alpha = 255;
@@ -373,7 +555,7 @@ class Stream {
             
             do {
                 // Get the initialization rectangle for this stream
-                const rect = initRectangles[this.assignedImageIdx];
+                const rect = this.isMaya ? mayaInitRectangles[this.assignedImageIdx] : initRectangles[this.assignedImageIdx];
                 if (!rect) break;
                 
                 // Get the main rectangle dimensions
@@ -409,7 +591,7 @@ class Stream {
                 startX = random(width);
                 startY = random(height);
             }
-            
+
             this.points.push(createVector(startX, startY));
         }
     }
@@ -419,14 +601,14 @@ class Stream {
     }
 
     isOverAnyImage(point) {
-        for (let img of images) {
+        for (let img of (this.isMaya ? mayaImages : images)) {
             if (this.isOverImage(point, img)) return true;
         }
         return false;
     }
 
     isOverAssignedImage(point) {
-        return this.isOverImage(point, images[this.assignedImageIdx]);
+        return this.isOverImage(point, this.isMaya ? mayaImages[this.assignedImageIdx] : images[this.assignedImageIdx]);
     }
 
     isOverImage(point, img) {
@@ -509,7 +691,7 @@ class Stream {
         let closestDistance = Infinity;
         let closestImageCenter;
 
-        for (let img of images) {
+        for (let img of (this.isMaya ? mayaImages : images)) {
             let distance = dist(point.x, point.y, imgCenter.x, imgCenter.y);
             if (distance < closestDistance && this.isOverImage(point, img)) {
                 closestDistance = distance;
@@ -530,7 +712,7 @@ class Stream {
         }
         
         // Get the assigned image
-        const img = images[imgIdx];
+        const img = this.isMaya ? mayaImages[imgIdx] : images[imgIdx];
         if (!img) return random(TWO_PI);
         
         // Calculate image bounds
@@ -602,6 +784,28 @@ function generateColorSet() {
         } else {
             let [h, s, v] = rgbToHsb(originalColor[0], originalColor[1], originalColor[2]);
             let newHue = (h + baseHue) % 360;
+            colors.push(hsbToRgb(newHue, s, v));
+        }
+    }
+    return colors;
+}
+
+function generateMayaColorSet() {
+    if (!isColorCycling) {
+        return mayaColorSets[0];
+    }
+    
+    let colors = [];
+    for (let i = 0; i < 27; i++) {
+        let originalColor = mayaColorSets[0][i];
+        
+        // Keep face, mouth, hands, and hair colors constant
+        if (i === 6 || i === 22 || i === 23 || i === 24 || i === 25 || i === 26) {  // mHands.png, mMouth.png, mFace.png, mHairLeft.png, mHairMid.png, mHairRight.png
+            colors.push(originalColor);
+        } else {
+            let [h, s, v] = rgbToHsb(originalColor[0], originalColor[1], originalColor[2]);
+            // Reverse the direction by subtracting baseHue instead of adding it
+            let newHue = (h - baseHue + 360) % 360;
             colors.push(hsbToRgb(newHue, s, v));
         }
     }
