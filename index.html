@@ -595,9 +595,15 @@ function generateColorSet() {
     let colors = [];
     for (let i = 0; i < 20; i++) {
         let originalColor = colorSets[0][i];
-        let [h, s, v] = rgbToHsb(originalColor[0], originalColor[1], originalColor[2]);
-        let newHue = (h + baseHue) % 360;
-        colors.push(hsbToRgb(newHue, s, v));
+        
+        // Keep face, mouth, and hands colors constant
+        if (i === 6 || i === 16 || i === 19) {  // hands.png, mouth.png, face.png
+            colors.push(originalColor);
+        } else {
+            let [h, s, v] = rgbToHsb(originalColor[0], originalColor[1], originalColor[2]);
+            let newHue = (h + baseHue) % 360;
+            colors.push(hsbToRgb(newHue, s, v));
+        }
     }
     return colors;
 }
