@@ -39,44 +39,48 @@ let isColorCycling = false;
 let baseHue = 0;
 const COLOR_CYCLE_SPEED = 1.1;
 
-function extractDominantColor(img) {
-    // Check if this is mouth.png or scarf3.png
-    if (img === images[13]) { // mouth.png
-        return [200, 50, 75]; // Lip red color
-    }
-    if (img === images[10]) { // scarf3.png
-        return [255, 165, 0]; // Orange color
-    }
+// Define initialization rectangles
+const initRectangles = [
+    { width: 100, height: 20, x: 57, y: 29 },  // hatStripe.png
+    { width: 100, height: 75, x: 57, y: 26 },  // hat.png
+    { width: 180, height: 90, x: 50, y: 81 },  // pants.png
+    { width: 85, height: 75, x: 59, y: 84 },   // hands.png
+    { width: 57, height: 49, x: 74, y: 84 },   // cuffRight.png
+    { width: 57, height: 49, x: 54, y: 82 },   // cuffLeft.png
+    { width: 181, height: 45, x: 47, y: 79 },  // scarf7.png
+    { width: 181, height: 56, x: 47, y: 73 },  // scarf6.png
+    { width: 181, height: 65, x: 47, y: 65 },  // scarf5.png
+    { width: 181, height: 84, x: 47, y: 57 },  // scarf4.png
+    { width: 181, height: 63, x: 47, y: 56 },  // scarf3.png
+    { width: 148, height: 78, x: 47, y: 35 },  // scarf2.png
+    { width: 156, height: 81, x: 54, y: 47 },  // scarf1.png
+    { width: 50, height: 26, x: 61, y: 46 },   // mouth.png
+    { width: 23, height: 12, x: 69, y: 41 },   // rightEye.png
+    { width: 23, height: 12, x: 60, y: 41 },   // leftEye.png
+    { width: 93, height: 75, x: 56, y: 38 }    // face.png
+];
 
-    // For all other images, sample points to find a non-transparent color
-    const samplePoints = 100;
-    let validColors = [];
-    
-    // Define margin to ignore (10% of width/height)
-    const marginX = img.width * 0.1;
-    const marginY = img.height * 0.1;
-    
-    for (let i = 0; i < samplePoints; i++) {
-        // Sample from the center area only, ignoring margins
-        const x = Math.floor(random(marginX, img.width - marginX));
-        const y = Math.floor(random(marginY, img.height - marginY));
-        const pixelColor = img.get(x, y);
-        
-        if (alpha(pixelColor) > transparencyThreshold) {
-            validColors.push([
-                red(pixelColor),
-                green(pixelColor),
-                blue(pixelColor)
-            ]);
-        }
-    }
-    
-    // If we found valid colors, return the first one
-    // Otherwise return a default color
-    return validColors.length > 0 ? validColors[0] : [255, 255, 255];
-}
-
-const colorSets = [[]];  // Will be populated with image colors
+const colorSets = [
+    [
+        [225, 125, 114],    // hatStripe.png - Golden yellow
+        [30, 127, 155],     // hat.png - Brown
+        [108, 17, 29],    // pants.png - Navy blue
+        [256, 221, 181],  // hands.png - Skin tone
+        [131, 30, 45],  // cuffRight.png - Light gray
+        [130, 21, 36],  // cuffLeft.png - Light gray
+        [103, 76, 118],    // scarf7.png - Orange
+        [24, 83, 128],    // scarf6.png - Light orange
+        [19, 96, 86],    // scarf5.png - Orange
+        [219, 102, 83],    // scarf4.png - Dark orange
+        [231, 86, 118],    // scarf3.png - Orange
+        [170, 18, 40],    // scarf2.png - Burnt orange
+        [219, 98, 80],    // scarf1.png - Deep orange
+        [200, 50, 75],    // mouth.png - Lip red
+        [0, 0, 0],     // rightEye.png - Dark gray
+        [0, 0, 1],     // leftEye.png - Dark gray
+        [255, 220, 180]   // face.png - Light skin tone
+    ]
+];
 
 function calculateMargin() {
     MARGIN = Math.min(windowWidth, windowHeight) * 0.1;
@@ -128,8 +132,6 @@ function preload() {
             let scaleFactor = dimensions.imageHeight / img.height;
             img.resize(img.width * scaleFactor, img.height * scaleFactor);
             images[i] = img;
-            // Extract color from the image and add it to the color set
-            colorSets[0][i] = extractDominantColor(img);
         });
     }
 }
@@ -186,10 +188,7 @@ function setup() {
     }
 
     generateStreams();
-    // Wait a short time to ensure colors are extracted before setting selectedColorSet
-    setTimeout(() => {
-        selectedColorSet = colorSets[0];
-    }, 100);
+    selectedColorSet = colorSets[0];
 }
 
 function windowResized() {
@@ -362,20 +361,33 @@ class Stream {
         } else {
             let startX, startY;
             let attempts = 0;
-            const maxAttempts = 100;
+            const maxAttempts = 200;
             
             do {
-                // Get the assigned image
-                const img = images[this.assignedImageIdx];
-                if (!img) break;
+                // Get the initialization rectangle for this stream
+                const rect = initRectangles[this.assignedImageIdx];
+                if (!rect) break;
                 
-                // Calculate the image's position on canvas
-                const imgX = width / 2 - img.width / 2;
-                const imgY = height / 2 - img.height / 2;
+                // Get the main rectangle dimensions
+                const dimensions = calculateImageDimensions();
                 
-                // Generate random point within the image bounds
-                startX = random(imgX, imgX + img.width);
-                startY = random(imgY, imgY + img.height);
+                // Calculate the actual pixel dimensions of the init rectangle
+                const rectPixelWidth = (rect.width / 100) * dimensions.rectWidth;
+                const rectPixelHeight = (rect.height / 100) * dimensions.rectHeight;
+                
+                // Calculate the center position of the init rectangle
+                const rectCenterX = imgCenter.x + ((rect.x - 50) / 100) * dimensions.rectWidth;
+                const rectCenterY = imgCenter.y + ((rect.y - 50) / 100) * dimensions.rectHeight;
+                
+                // Calculate the bounds of the init rectangle
+                const rectLeft = rectCenterX - rectPixelWidth / 2;
+                const rectRight = rectCenterX + rectPixelWidth / 2;
+                const rectTop = rectCenterY - rectPixelHeight / 2;
+                const rectBottom = rectCenterY + rectPixelHeight / 2;
+                
+                // Generate random point within the init rectangle bounds
+                startX = random(rectLeft, rectRight);
+                startY = random(rectTop, rectBottom);
                 
                 attempts++;
             } while (
