@@ -21,9 +21,9 @@
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script>
-let images = new Array(17).fill(null);
+let images = new Array(20).fill(null);
 const transparencyThreshold = 128;
-const numOfStreams = 2000;
+const numOfStreams = 3000;
 let imgCenter; 
 let pointImageOverlapCache = {};  
 let circleDiameter;
@@ -42,8 +42,11 @@ const COLOR_CYCLE_SPEED = 1.1;
 // Define initialization rectangles
 const initRectangles = [
     { width: 100, height: 20, x: 57, y: 29 },  // hatStripe.png
-    { width: 100, height: 75, x: 57, y: 26 },  // hat.png
-    { width: 180, height: 90, x: 50, y: 81 },  // pants.png
+    { width: 86, height: 39, x: 57, y: 25 },  // hatTop.png
+    { width: 111, height: 74, x: 55, y: 30 },  // hatBottom.png
+    { width: 89, height: 74, x: 48, y: 85 },  // pantsLeft.png
+    { width: 70, height: 46, x: 62, y: 80 },  // pantsMid.png
+    { width: 94, height: 74, x: 74, y: 85 },  // pantsRight.png
     { width: 85, height: 75, x: 59, y: 84 },   // hands.png
     { width: 57, height: 49, x: 74, y: 84 },   // cuffRight.png
     { width: 57, height: 49, x: 54, y: 82 },   // cuffLeft.png
@@ -63,8 +66,11 @@ const initRectangles = [
 const colorSets = [
     [
         [225, 125, 114],    // hatStripe.png - Golden yellow
-        [30, 127, 155],     // hat.png - Brown
-        [108, 17, 29],    // pants.png - Navy blue
+        [30, 127, 155],     // hatTop.png - Brown
+        [29, 126, 154],     // hatBottom.png - Brown
+        [108, 17, 29],    // pantsLeft.png - Navy blue
+        [107, 17, 29],    // pantsMid.png - Navy blue
+        [108, 17, 30],    // pantsRight.png - Navy blue
         [256, 221, 181],  // hands.png - Skin tone
         [131, 30, 45],  // cuffRight.png - Light gray
         [130, 21, 36],  // cuffLeft.png - Light gray
@@ -120,11 +126,10 @@ function preload() {
     let dimensions = calculateImageDimensions();
     
     let imageNames = [
-        "hatStripe.png", "hat.png", "pants.png", "hands.png", 
-        "cuffRight.png", "cuffLeft.png", "scarf7.png", "scarf6.png", 
-        "scarf5.png", "scarf4.png", "scarf3.png", "scarf2.png", 
-        "scarf1.png", "mouth.png", "rightEye.png", "leftEye.png", 
-        "face.png"
+        "hatStripe.png", "hatTop.png", "hatBottom.png", "pantsLeft.png", "pantsMid.png",
+        "pantsRight.png", "hands.png", "cuffRight.png", "cuffLeft.png", "scarf7.png",
+        "scarf6.png", "scarf5.png", "scarf4.png", "scarf3.png", "scarf2.png", 
+        "scarf1.png", "mouth.png", "rightEye.png", "leftEye.png", "face.png"
     ];
     
     for (let i = 0; i < imageNames.length; i++) {
@@ -150,8 +155,11 @@ function generateStreams() {
     // Distribution percentages for each image (must add up to 1.0)
     const percentages = [
         0.03,  // hatStripe.png
-        0.08,  // hat.png
-        0.08,  // pants.png
+        0.03,  // hatTop.png
+        0.05,  // hatBottom.png
+        0.04,  // pantsLeft.png
+        0.02,  // pantsMid.png
+        0.04,  // pantsRight.png
         0.06,  // hands.png
         0.04,  // cuffRight.png
         0.04,  // cuffLeft.png
@@ -161,11 +169,11 @@ function generateStreams() {
         0.05,  // scarf4.png
         0.05,  // scarf3.png
         0.07,  // scarf2.png
-        0.07,  // scarf1.png
-        0.04,  // mouth.png
+        0.08,  // scarf1.png
+        0.005,  // mouth.png
         0.02,  // rightEye.png
         0.02,  // leftEye.png
-        0.12   // face.png
+        0.125   // face.png
     ];  // Total: 1.0 (100%)
 
     desiredStreamCounts = [];
@@ -183,7 +191,7 @@ function setup() {
     imgCenter = createVector(width / 2, height / 2);
     background(0, 0, 0);
     
-    for (let i = 0; i < 17; i++) {
+    for (let i = 0; i < 20; i++) {
         streamGroups.push([]);
     }
 
@@ -250,7 +258,7 @@ function draw() {
 function adjustStreams() {
     if (!selectedColorSet) return;
 
-    for (let j = 0; j < 17; j++) {
+    for (let j = 0; j < 20; j++) {
         while (streamGroups[j].length < desiredStreamCounts[j]) {
             let samplePoint = streamGroups[j].length > 0 ? random(random(streamGroups[j]).points) : null;
             streamGroups[j].push(new Stream(selectedColorSet[j], j, samplePoint));
@@ -453,19 +461,29 @@ class Stream {
         let lastPoint = this.points[this.points.length - 1];
         let newPoint;
 
-        let speed = this.attractMode ? BASE_SPEED + LOG_SCALE_FACTOR * Math.log(this.totalStreamsCount + 1) : 12;
+        // Smoother speed calculation with less variation
+        let speed = this.attractMode ? 
+            BASE_SPEED + (LOG_SCALE_FACTOR * 0.5) * Math.log(this.totalStreamsCount + 1) : 
+            8;  // Reduced from 12 to 8 for smoother repulsion
 
         if (this.attractMode) {
             if (this.isOutsideAllImages(lastPoint) || this.insideImage || this.isOverAssignedImage(lastPoint)) {
-                this.currentAngle = this.calculateAngleTowardsImage(lastPoint, this.assignedImageIdx);
+                // Smoothly interpolate between current angle and target angle
+                let targetAngle = this.calculateAngleTowardsImage(lastPoint, this.assignedImageIdx);
+                let angleDiff = (targetAngle - this.currentAngle + PI) % TWO_PI - PI;
+                this.currentAngle += angleDiff * 0.1;  // Gradual turn
             }
         } else {
             if (this.isOverAnyImage(lastPoint)) {
-                this.currentAngle = this.calculateAngleAwayFromClosestImageCenter(lastPoint);
+                // Smoothly interpolate between current angle and escape angle
+                let targetAngle = this.calculateAngleAwayFromClosestImageCenter(lastPoint);
+                let angleDiff = (targetAngle - this.currentAngle + PI) % TWO_PI - PI;
+                this.currentAngle += angleDiff * 0.1;  // Gradual turn
             }
         }
 
-        let angleVariation = map(noise(this.noiseOffset), 0, .025, -PI, PI);
+        // Reduced angle variation for smoother movement
+        let angleVariation = map(noise(this.noiseOffset), 0, 1, -PI/8, PI/8);  // Reduced from PI to PI/8
         this.currentAngle += angleVariation;
 
         newPoint = p5.Vector.fromAngle(this.currentAngle).mult(speed).add(lastPoint);
@@ -478,7 +496,7 @@ class Stream {
         this.stayWithinBounds(newPoint);
 
         this.points.push(newPoint);
-        this.noiseOffset += 0.001;
+        this.noiseOffset += 0.0005;  // Reduced from 0.001 for smoother noise variation
 
         if (this.points.length > 100) {
             this.points.shift();
@@ -575,7 +593,7 @@ function generateColorSet() {
     }
     
     let colors = [];
-    for (let i = 0; i < 17; i++) {
+    for (let i = 0; i < 20; i++) {
         let originalColor = colorSets[0][i];
         let [h, s, v] = rgbToHsb(originalColor[0], originalColor[1], originalColor[2]);
         let newHue = (h + baseHue) % 360;
